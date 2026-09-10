@@ -22,6 +22,9 @@ from app.crud import (
 from app.voice_bot import VoiceBotEngine
 from app.seed_data import seed_database
 
+import os
+from fastapi.staticfiles import StaticFiles
+
 app = FastAPI(
     title="Smart Farmer Procurement Slot Booking & Tracking System API",
     description="Backend API for Ministry of Consumer Affairs, Food & Public Distribution (DoCA) - SIH 2026",
@@ -222,3 +225,9 @@ def update_msp_rate(crop_id: int, new_rate: float, db: Session = Depends(get_db)
     db.add(new_rate_obj)
     db.commit()
     return {"status": "SUCCESS", "crop_id": crop_id, "new_msp_rate": new_rate}
+
+# Mount Frontend static files for Render single-service deployment
+frontend_dist_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
+if os.path.exists(frontend_dist_path):
+    app.mount("/", StaticFiles(directory=frontend_dist_path, html=True), name="static")
+
