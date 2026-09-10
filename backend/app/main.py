@@ -45,7 +45,7 @@ def startup_event():
     # Initialize database tables and seed sample data
     seed_database()
 
-@app.get("/")
+@app.get("/api/health")
 def read_root():
     return {
         "status": "online",
