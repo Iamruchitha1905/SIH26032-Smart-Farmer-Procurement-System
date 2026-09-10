@@ -226,8 +226,27 @@ def update_msp_rate(crop_id: int, new_rate: float, db: Session = Depends(get_db)
     db.commit()
     return {"status": "SUCCESS", "crop_id": crop_id, "new_msp_rate": new_rate}
 
-# Mount Frontend static files for Render single-service deployment
-frontend_dist_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
-if os.path.exists(frontend_dist_path):
-    app.mount("/", StaticFiles(directory=frontend_dist_path, html=True), name="static")
+from fastapi.responses import FileResponse
+
+# Mount Frontend static assets and SPA catch-all route for Render deployment
+frontend_dist_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+assets_path = os.path.join(frontend_dist_path, "assets")
+
+if os.path.exists(assets_path):
+    app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+
+@app.get("/{full_path:path}")
+async def serve_react_app(full_path: str):
+    if full_path.startswith("api"):
+        raise HTTPException(status_code=404, detail="API route not found")
+    index_file = os.path.join(frontend_dist_path, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {
+        "status": "online",
+        "system": "Smart Farmer Procurement Slot Booking & Tracking System (SIH26032)",
+        "organization": "Department of Consumer Affairs (DoCA)",
+        "note": "Frontend static index.html pending build."
+    }
+
 
