@@ -37,6 +37,7 @@ export default function FarmerPortal({ activeDemoStep }) {
   const [selectedCentre, setSelectedCentre] = useState(null);
   const [slots, setSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [activeBooking, setActiveBooking] = useState(null);
   const [showDelayModal, setShowDelayModal] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -84,17 +85,44 @@ export default function FarmerPortal({ activeDemoStep }) {
     }
   };
 
-  const selectCentreItem = async (centre) => {
+  const selectCentreItem = async (centre, date) => {
     setSelectedCentre(centre);
+    const fetchDate = date || selectedDate;
     try {
-      const slotData = await api.getCentreSlots(centre.id);
+      const slotData = await api.getCentreSlots(centre.id, fetchDate);
       setSlots(slotData);
+      setSelectedSlot(null);
       const available = slotData.find((s) => !s.is_full);
       if (available) setSelectedSlot(available);
     } catch (err) {
       console.error(err);
     }
   };
+
+  const handleDateChange = async (date) => {
+    setSelectedDate(date);
+    setSelectedSlot(null);
+    if (selectedCentre) {
+      try {
+        const slotData = await api.getCentreSlots(selectedCentre.id, date);
+        setSlots(slotData);
+        const available = slotData.find((s) => !s.is_full);
+        if (available) setSelectedSlot(available);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  // Generate next 7 days for the date picker
+  const next7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    return {
+      dateStr: d.toISOString().split("T")[0],
+      label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })
+    };
+  });
 
   const loadFarmerBooking = async () => {
     try {
@@ -360,36 +388,73 @@ export default function FarmerPortal({ activeDemoStep }) {
               ))}
             </div>
 
-            {/* Time Slot Selection */}
+            {/* Date & Time Slot Selection */}
             {selectedCentre && (
               <div style={{ marginTop: 16 }}>
-                <label style={{ fontWeight: 600, display: "block", marginBottom: 8 }}>
-                  3. {t("select_date_slot")} ({selectedCentre.name}):
+                {/* Date Picker Row */}
+                <label style={{ fontWeight: 600, display: "block", marginBottom: 10, color: "#f59e0b" }}>
+                  3. Pick a Date:
                 </label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {slots.map((s) => (
+                <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 16 }}>
+                  {next7Days.map(({ dateStr, label }) => (
                     <button
-                      key={s.id}
-                      disabled={s.is_full}
-                      onClick={() => setSelectedSlot(s)}
+                      key={dateStr}
+                      onClick={() => handleDateChange(dateStr)}
                       style={{
-                        padding: "10px",
+                        padding: "8px 14px",
                         borderRadius: "10px",
-                        backgroundColor: s.is_full ? "#334155" : selectedSlot?.id === s.id ? "#10b981" : "#0f172a",
-                        color: s.is_full ? "#94a3b8" : selectedSlot?.id === s.id ? "#064e3b" : "#fff",
-                        border: "1px solid #334155",
-                        fontWeight: "600",
-                        fontSize: "0.85rem"
+                        backgroundColor: selectedDate === dateStr ? "#f59e0b" : "#0f172a",
+                        color: selectedDate === dateStr ? "#000" : "#fff",
+                        border: selectedDate === dateStr ? "2px solid #f59e0b" : "1px solid #334155",
+                        fontWeight: selectedDate === dateStr ? "800" : "600",
+                        fontSize: "0.78rem",
+                        whiteSpace: "nowrap",
+                        cursor: "pointer"
                       }}
                     >
-                      {s.time_window} {s.is_full ? `(${t("slot_full")})` : `(${s.max_farmers - s.booked_count} left)`}
+                      {label}<br />
+                      <span style={{ fontSize: "0.65rem", opacity: 0.8 }}>{dateStr}</span>
                     </button>
                   ))}
                 </div>
 
+                {/* Time Slot Grid */}
+                <label style={{ fontWeight: 600, display: "block", marginBottom: 8, color: "#10b981" }}>
+                  4. Pick a Time Slot:
+                </label>
+                {slots.length === 0 ? (
+                  <div style={{ color: "#94a3b8", fontSize: "0.9rem", padding: "12px 0" }}>No slots available for this date.</div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    {slots.map((s) => (
+                      <button
+                        key={s.id}
+                        disabled={s.is_full}
+                        onClick={() => setSelectedSlot(s)}
+                        style={{
+                          padding: "10px",
+                          borderRadius: "10px",
+                          backgroundColor: s.is_full ? "#334155" : selectedSlot?.id === s.id ? "#10b981" : "#0f172a",
+                          color: s.is_full ? "#94a3b8" : selectedSlot?.id === s.id ? "#064e3b" : "#fff",
+                          border: selectedSlot?.id === s.id ? "2px solid #10b981" : "1px solid #334155",
+                          fontWeight: "600",
+                          fontSize: "0.85rem",
+                          cursor: s.is_full ? "not-allowed" : "pointer"
+                        }}
+                      >
+                        <div>{s.time_window}</div>
+                        <div style={{ fontSize: "0.7rem", marginTop: 2, color: s.is_full ? "#64748b" : selectedSlot?.id === s.id ? "#064e3b" : "#94a3b8" }}>
+                          {s.is_full ? `❌ ${t("slot_full")}` : `✅ ${s.max_farmers - s.booked_count} seats left`}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <button
                   className="btn-large btn-primary"
-                  style={{ width: "100%", marginTop: 20 }}
+                  style={{ width: "100%", marginTop: 20, opacity: (!selectedSlot || selectedSlot.is_full) ? 0.5 : 1 }}
+                  disabled={!selectedSlot || selectedSlot.is_full}
                   onClick={handleBookSlotSubmit}
                 >
                   <Award size={20} /> {t("book_now")}
