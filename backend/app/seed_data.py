@@ -168,9 +168,9 @@ def seed_database():
         db.refresh(p_centre)
         centre_objects.append(p_centre)
 
-    # 5. Slots Creation
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    tomorrow_str = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    # 5. Slots Creation — 7 days ahead (today + 6 days)
+    days_ahead = [(datetime.now() + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
+    today_str = days_ahead[0]
 
     time_windows = [
         "09:00 AM - 10:00 AM",
@@ -183,15 +183,22 @@ def seed_database():
 
     slot_objects = []
     for centre in centre_objects:
-        for day in [today_str, tomorrow_str]:
+        for day_offset, day in enumerate(days_ahead):
             for idx, tw in enumerate(time_windows):
-                # For Centre A (Mandya - Overloaded demo), make early slots FULL
+                # Centre A (Mandya) is overloaded today — early slots FULL
                 if centre.id == 1 and idx < 3 and day == today_str:
                     booked = 10
                 elif centre.id == 1 and idx == 3 and day == today_str:
                     booked = 8
+                # Days closer to today are busier; farther dates have fewer bookings
+                elif day_offset == 0:
+                    booked = random.randint(4, 8)   # today — busy
+                elif day_offset == 1:
+                    booked = random.randint(3, 7)   # tomorrow — moderate
+                elif day_offset <= 3:
+                    booked = random.randint(1, 5)   # day 2-3 — lighter
                 else:
-                    booked = random.randint(1, 4)
+                    booked = random.randint(0, 3)   # day 4-6 — mostly free
 
                 slot = Slot(
                     centre_id=centre.id,
